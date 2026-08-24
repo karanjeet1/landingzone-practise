@@ -7,7 +7,7 @@ on:
       - "features/**" # Triggers on any branch starting with features
 
 env:
-  TF_WORKING_DIR: 'landingzone-practise/environment/sandbox'
+  TF_WORKING_DIR: 'environment/sandbox'
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
