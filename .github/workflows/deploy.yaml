@@ -1,0 +1,112 @@
+name: Deploy 
+
+on:
+  push:
+    branches: 
+      - "main"
+      - "features/**" # Triggers on any branch starting with features
+
+env:
+  TF_WORKING_DIR: 'environment/sandbox'
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }} 
+
+# Grants the workflow token permission to read contents and write pull requests
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # 1. CI Job: Runs on both feature branches and main
+  terraform-ci:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+  # 2. PR Job: Creates PR automatically if on a feature branch and CI passes
+  create-pr:
+    name: 'Create Pull Request'
+    needs: terraform-ci
+    runs-on: ubuntu-latest
+    # Only run this job if the branch starts with "feature/"
+    if: startsWith(github.ref, 'refs/heads/features/') 
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request to Main
+        run: |
+          # Check if a PR already exists for this branch to prevent workflow errors on subsequent pushes
+          PR_EXISTS=$(gh pr list --head ${GITHUB_REF_NAME} --base main --json number --jq 'length')
+          
+          if [ "$PR_EXISTS" -eq "0" ]; then
+            gh pr create \
+              --base main \
+              --head ${GITHUB_REF_NAME} \
+              --title "Auto PR: Terraform changes from ${GITHUB_REF_NAME}" \
+              --body "Automated PR created by GitHub Actions after successful Terraform Plan. Waiting for approval from @karanjeet1." \
+              --reviewer karanjeetsingh-1
+          else
+            echo "Pull Request already exists for this branch. Skipping PR creation."
+          fi
+        env:
+          # Authenticate the GitHub CLI using the built-in token
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 3. CD Job: Applies changes ONLY when code hits the main branch
+  terraform-apply:
+    name: 'Terraform Apply'
+    needs: terraform-ci
+    runs-on: ubuntu-latest
+    environment: dev-approval # Pauses for your manual collaborator approval
+    if: github.ref == 'refs/heads/main'
+    
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+        
+      - name: Terraform Format
+        run: terraform fmt
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
