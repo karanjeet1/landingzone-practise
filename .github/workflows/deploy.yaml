@@ -69,7 +69,7 @@ jobs:
               --head ${GITHUB_REF_NAME} \
               --title "Auto PR: Terraform changes from ${GITHUB_REF_NAME}" \
               --body "Automated PR created by GitHub Actions after successful Terraform Plan. Waiting for approval from @karanjeet1." \
-              --reviewer karanjeet1
+              --reviewer karanjeetsingh-1
           else
             echo "Pull Request already exists for this branch. Skipping PR creation."
           fi
