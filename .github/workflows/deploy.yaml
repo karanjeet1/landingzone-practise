@@ -52,7 +52,7 @@ jobs:
     needs: terraform-ci
     runs-on: ubuntu-latest
     # Only run this job if the branch starts with "feature/"
-    if: startsWith(github.ref, 'refs/heads/feature/') 
+    if: startsWith(github.ref, 'refs/heads/features/') 
     
     steps:
       - name: Checkout Repository
